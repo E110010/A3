@@ -104,6 +104,7 @@ public class Ant : MonoBehaviour
         int x = Mathf.RoundToInt(transform.position.x);
         int y = Mathf.RoundToInt(transform.position.y) - 1;
         int z = Mathf.RoundToInt(transform.position.z);
+        if (y < 0) return; // Out of bounds check
         
         AbstractBlock block = worldManager.GetBlock(x, y, z);
         
@@ -139,6 +140,9 @@ void BuildNest()
     int x = Mathf.RoundToInt(transform.position.x);
     int y = Mathf.RoundToInt(transform.position.y);
     int z = Mathf.RoundToInt(transform.position.z);
+    if (y < 0  || y >= worldManager.WorldHeight) return; // Out of bounds check
+    if (x < 0  || x >= worldManager.WorldWidth) return; // Out of bounds check
+    if (z < 0  || z >= worldManager.WorldDepth) return; // Out of bounds check
     
     // Pick a random adjacent horizontal direction
     int dir = Random.Range(0, 4);
@@ -177,7 +181,7 @@ void BuildNest()
     int GetGroundHeight(int x, int z)
     {
         // Find the highest non-air block
-        for (int y = 100; y >= 0; y--)
+        for (int y = worldManager.WorldHeight - 1; y >= 0; y--)
         {
             AbstractBlock block = worldManager.GetBlock(x, y, z);
             if (!(block is AirBlock))
@@ -193,6 +197,7 @@ void BuildNest()
         int x = Mathf.RoundToInt(transform.position.x);
         int y = Mathf.RoundToInt(transform.position.y) - 1; // Block below
         int z = Mathf.RoundToInt(transform.position.z);
+        if (y < 0) return; // Out of bounds check
         
         AbstractBlock block = worldManager.GetBlock(x, y, z);
         
