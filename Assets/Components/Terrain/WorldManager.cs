@@ -11,6 +11,8 @@ namespace Antymology.Terrain
 
         #region Fields
 
+        public int nestCount = 0;
+
         /// <summary>
         /// The prefab containing the ant.
         /// </summary>
@@ -81,6 +83,7 @@ namespace Antymology.Terrain
             Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
 
             GenerateAnts();
+            gameObject.AddComponent<NestCounter>();
         }
 
         /// <summary>
@@ -88,8 +91,52 @@ namespace Antymology.Terrain
         /// </summary>
         private void GenerateAnts()
         {
-            throw new NotImplementedException();
+            // Spawn 1 Queen
+            int qx = RNG.Next(10, Blocks.GetLength(0) - 10);
+            int qz = RNG.Next(10, Blocks.GetLength(2) - 10);
+            int qy = Blocks.GetLength(1) - 1;
+            for (int checkY = Blocks.GetLength(1) - 1; checkY >= 0; checkY--)
+            {
+                if (!(Blocks[qx, checkY, qz] is AirBlock))
+                {
+                    qy = checkY + 2;
+                    break;
+                }
+            }
+            GameObject queen = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            queen.transform.position = new Vector3(qx, qy, qz);
+            queen.transform.localScale = Vector3.one * 1.0f; //bigger
+            queen.GetComponent<Renderer>().material.color = Color.yellow; //yellow
+            Ant queenAnt = queen.AddComponent<Ant>();
+            queenAnt.isQueen = true;
+            queenAnt.maxHealth = 100f;
+            queenAnt.health = 100f;
+            queen.name = "Queen";
+            
+            // Spawn 10 regular ants
+            for (int i = 0; i < 10; i++)
+            {
+                int x = RNG.Next(10, Blocks.GetLength(0) - 10);
+                int z = RNG.Next(10, Blocks.GetLength(2) - 10);
+                int y = Blocks.GetLength(1) - 1;
+                for (int checkY = Blocks.GetLength(1) - 1; checkY >= 0; checkY--)
+                {
+                    if (!(Blocks[qx, checkY, qz] is AirBlock))
+                    {
+                        y = checkY + 2;
+                        break;
+                    }
+                }
+                
+                GameObject ant = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                ant.transform.position = new Vector3(x, y, z);
+                ant.transform.localScale = Vector3.one * 0.5f;
+                ant.AddComponent<Ant>();
+                ant.GetComponent<Renderer>().material.color = Color.red;
+                ant.name = "Ant_" + i;
+            }
         }
+
 
         #endregion
 
