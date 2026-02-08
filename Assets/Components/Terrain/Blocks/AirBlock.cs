@@ -15,6 +15,10 @@ namespace Antymology.Terrain
 
         #region Fields
 
+        public float foodPheromone = 0f;
+        public float nestPheromone = 0f;
+        public float dangerPheromone = 0f;
+
         /// <summary>
         /// Statically held is visible.
         /// </summary>

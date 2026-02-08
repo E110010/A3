@@ -11,6 +11,11 @@ namespace Antymology.Terrain
 
         #region Fields
 
+        public Ant queen2;
+
+        const float EvaporationRate = 0.8f;
+        const float diffusionRate = 0.1f;
+
         public int nestCount = 0;
 
         /// <summary>
@@ -112,6 +117,9 @@ namespace Antymology.Terrain
             queenAnt.maxHealth = 100f;
             queenAnt.health = 100f;
             queen.name = "Queen";
+
+            queen2 = queenAnt;
+            
             
             // Spawn 10 regular ants
             for (int i = 0; i < 10; i++)
@@ -482,5 +490,115 @@ namespace Antymology.Terrain
         #endregion
 
         #endregion
+
+        void Update()
+        {
+            updatePheromones();
+            diffusePheromones();
+        }
+
+        private void updatePheromones()
+        {
+            for (int x = 0; x < Blocks.GetLength(0); x++)
+                for (int z = 0; z < Blocks.GetLength(2); z++)
+                    for (int y = 0; y < Blocks.GetLength(1); y++)
+                    {
+                        if (Blocks[x, y, z] is AirBlock)
+                        {
+                            AirBlock air = Blocks[x, y, z] as AirBlock;
+                            air.foodPheromone *= EvaporationRate;
+                            air.nestPheromone *= EvaporationRate;
+                            air.dangerPheromone *= EvaporationRate;
+                        }
+                    }
+        }
+
+        private void diffusePheromones()
+        {
+            float[,,] newFood = new float[ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
+                ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter,
+                ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter];
+            float[,,] newNest = new float[ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
+                ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter,
+                ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter];
+            float[,,] newDanger = new float[ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
+                ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter,
+                ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter];
+
+            for (int x = 0; x < Blocks.GetLength(0); x++)
+                for (int z = 0; z < Blocks.GetLength(2); z++)
+                    for (int y = 0; y < Blocks.GetLength(1); y++)
+                    {
+                        if (Blocks[x, y, z] is AirBlock)
+                        {
+                            AirBlock air = Blocks[x, y, z] as AirBlock;
+                            float totalFood = 0f;
+                            float totalNest = 0f;
+                            float totalDanger = 0f;
+
+                            // Sum up pheromones from adjacent blocks
+                            if (x > 0 && Blocks[x - 1, y, z] is AirBlock)
+                            {
+                                AirBlock adjAir = Blocks[x - 1, y, z] as AirBlock;
+                                totalFood += adjAir.foodPheromone;
+                                totalNest += adjAir.nestPheromone;
+                                totalDanger += adjAir.dangerPheromone;
+                            }
+                            if (x < Blocks.GetLength(0) - 1 && Blocks[x + 1, y, z] is AirBlock)
+                            {
+                                AirBlock adjAir = Blocks[x + 1, y, z] as AirBlock;
+                                totalFood += adjAir.foodPheromone;
+                                totalNest += adjAir.nestPheromone;
+                                totalDanger += adjAir.dangerPheromone;
+                            }
+                            if (y > 0 && Blocks[x, y - 1, z] is AirBlock)
+                            {
+                                AirBlock adjAir = Blocks[x, y - 1, z] as AirBlock;
+                                totalFood += adjAir.foodPheromone;
+                                totalNest += adjAir.nestPheromone;
+                                totalDanger += adjAir.dangerPheromone;
+                            }
+                            if (y < Blocks.GetLength(1) - 1 && Blocks[x, y + 1, z] is AirBlock)
+                            {
+                                AirBlock adjAir = Blocks[x, y + 1, z] as AirBlock;
+                                totalFood += adjAir.foodPheromone;
+                                totalNest += adjAir.nestPheromone;
+                                totalDanger += adjAir.dangerPheromone;
+                            }
+                            if (z > 0 && Blocks[x, y, z - 1] is AirBlock)
+                            {
+                                AirBlock adjAir = Blocks[x, y, z - 1] as AirBlock;
+                                totalFood += adjAir.foodPheromone;
+                                totalNest += adjAir.nestPheromone;
+                                totalDanger += adjAir.dangerPheromone;
+                            }
+                            if (z < Blocks.GetLength(2) - 1 && Blocks[x, y, z + 1] is AirBlock)
+                            {
+                                AirBlock adjAir = Blocks[x, y, z + 1] as AirBlock;
+                                totalFood += adjAir.foodPheromone;
+                                totalNest += adjAir.nestPheromone;
+                                totalDanger += adjAir.dangerPheromone;
+                            }
+
+                            // Diffuse pheromones
+                            newFood[x,y,z] = air.foodPheromone + diffusionRate * (totalFood / 6f);
+                            newNest[x,y,z] = air.nestPheromone + diffusionRate * (totalNest / 6f);
+                            newDanger[x,y,z] = air.dangerPheromone + diffusionRate * (totalDanger / 6f);
+                        }
+                    }
+
+            // Update the pheromone values in the world
+            for (int x = 0; x < newFood.GetLength(0); x++)
+                for (int z = 0; z < newFood.GetLength(2); z++)
+                    for (int y = 0; y < newFood.GetLength(1); y++)
+                    {
+                        if (Blocks[x,y,z] is AirBlock)
+                        {
+                           ((AirBlock)Blocks[x,y,z]).foodPheromone = newFood[x,y,z];
+                           ((AirBlock)Blocks[x,y,z]).nestPheromone = newNest[x,y,z];
+                           ((AirBlock)Blocks[x,y,z]).dangerPheromone = newDanger[x,y,z];
+                        }
+                    }
+        }
     }
 }

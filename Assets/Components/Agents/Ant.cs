@@ -3,6 +3,9 @@ using Antymology.Terrain;
 
 public class Ant : MonoBehaviour
 {
+    private float actionCooldown = 0.5f; // seconds between actions
+    private float actionTimer = 0f;
+
     //health
     public float health = 100f;
     //can't heal above max
@@ -13,62 +16,82 @@ public class Ant : MonoBehaviour
     public bool isQueen = false;
     
     private WorldManager worldManager;
+    private ConfigurationManager config;
     
     void Start()
     {
         worldManager = WorldManager.Instance;
+        config = ConfigurationManager.Instance;
     }
     
     void Update()
     {
-        //drain health over time
-        float drainMultiplier = 1f;
-        
-        //Check if standing on acidic block
-        AbstractBlock blockBelow = GetBlockBelow();
-        if (blockBelow is AcidicBlock)
+        actionTimer -= Time.deltaTime;
+        if (actionTimer <= 0f)
         {
-            //If yes, die faster
-            drainMultiplier = 2f;
-        }
-        //adjust health
-        health -= healthDrainRate * drainMultiplier * Time.deltaTime;
-        
-        //If health hits 0
-        if (health <= 0)
-        {
-            //die
-            Destroy(gameObject);
-            return;
-        }
-        
-        //If need healing (under half health)
-        if (health < (maxHealth * 0.5f))
-        {
-            //attempt to heal
-            TryEatMulch();
-        }
-        
-        // Currently move randomly once in a while
-        if (!isQueen){
-            MoveRandomly();
-        }
-
+            actionTimer = actionCooldown; // reset timer
+            //drain health over time
+            float drainMultiplier = 3f;
             
-        // Queen builds randomly and if health is high
-        if (isQueen && (health > maxHealth * 0.4f))
-        {
-            BuildNest();
-        }
+            //Check if standing on acidic block
+            AbstractBlock blockBelow = GetBlockBelow();
+            if (blockBelow is AcidicBlock)
+            {
+                Vector3 pos = transform.position;
+                int x = Mathf.RoundToInt(pos.x);
+                int y = Mathf.RoundToInt(pos.y);
+                int z = Mathf.RoundToInt(pos.z);
+                AbstractBlock block = WorldManager.Instance.GetBlock(x,y,z);
+                if (block is AirBlock air){
+                    air.dangerPheromone += 1f; // Leave a pheromone trail to warn other ants
+                    air.dangerPheromone = Mathf.Clamp(air.dangerPheromone, 0f, 100f); // Cap the pheromone level
+                }
+                //If yes, die faster
+                drainMultiplier = 2f;
+            }
+            //adjust health
+            health -= healthDrainRate * drainMultiplier * Time.deltaTime;
+            
+            //If health hits 0
+            if (health <= 0)
+            {
+                //die
+                Destroy(gameObject);
+                return;
+            }
+            
+            //If need healing (under half health)
+            if (health < (maxHealth * 0.5f))
+            {
+                //attempt to heal
+                TryEatMulch();
+            }
+            
+            // Currently move randomly once in a while
+            if (!isQueen){
+                MoveUsingPheromones();
+            }
 
-        // Sometimes dig randomly
-        if (Random.value < 0.01f)
-        {
-            TryDig();
-        }
+                
+            // Queen builds randomly and if health is high
+            if (isQueen && (health > maxHealth * 0.4f))
+            {
+                BuildNest();
+            }
 
-        // Try to share health with nearby ants
-        TryShareHealth();
+            // Sometimes dig randomly
+            // if (Random.value < 0.01f)
+            // {
+            //     TryDig();
+            // }
+
+            // Try to share health with nearby ants
+            TryShareHealth();
+
+            if(isQueen){
+                emitNestPheromones();
+            }
+        }
     }
     
     void MoveRandomly()
@@ -111,7 +134,7 @@ public class Ant : MonoBehaviour
         if (block is MulchBlock)
         {
             // Check if another ant is on this same block
-            Collider[] nearbyColliders = Physics.OverlapSphere(new Vector3(x, y + 1, z), 0.3f);
+            Collider[] nearbyColliders = Physics.OverlapSphere(new Vector3(x, y + 1, z), 0.5f);
             int antCount = 0;
             
             foreach (Collider col in nearbyColliders)
@@ -124,7 +147,9 @@ public class Ant : MonoBehaviour
             if (antCount == 1)
             {
                 health = maxHealth;
-                worldManager.SetBlock(x, y, z, new AirBlock());
+                AirBlock air = new AirBlock();
+                air.foodPheromone = 50f; // Leave a strong pheromone trail to attract other ants
+                worldManager.SetBlock(x, y, z, air); // Replace mulch with air
                 Debug.Log("Ant ate mulch!");
             }
         }
@@ -140,27 +165,18 @@ void BuildNest()
     int x = Mathf.RoundToInt(transform.position.x);
     int y = Mathf.RoundToInt(transform.position.y);
     int z = Mathf.RoundToInt(transform.position.z);
-    if (y < 0  || y >= worldManager.WorldHeight) return; // Out of bounds check
-    if (x < 0  || x >= worldManager.WorldWidth) return; // Out of bounds check
-    if (z < 0  || z >= worldManager.WorldDepth) return; // Out of bounds check
-    
-    // Pick a random adjacent horizontal direction
-    int dir = Random.Range(0, 4);
-    int buildX = x;
-    int buildZ = z;
-    
-    if (dir == 0) buildX += 1;
-    else if (dir == 1) buildX -= 1;
-    else if (dir == 2) buildZ += 1;
-    else buildZ -= 1;
+    if (y < 0  || y >= (config.World_Height * config.Chunk_Diameter)) return; // Out of bounds check
+    if (x < 0  || x >= config.World_Diameter * config.Chunk_Diameter) return; // Out of bounds check
+    if (z < 0  || z >= config.World_Diameter * config.Chunk_Diameter) return; // Out of bounds check
     
     //Try to build at the same height level
-    AbstractBlock adjacentBlock = worldManager.GetBlock(buildX, y, buildZ);
+    AbstractBlock adjacentBlock = worldManager.GetBlock(x, y, z);
     
     // Only build if that spot is air
     if (adjacentBlock is AirBlock)
     {
-        worldManager.SetBlock(buildX, y, buildZ, new NestBlock());
+        transform.Translate(Vector3.up);
+        worldManager.SetBlock(x,y,z,new NestBlock());
         worldManager.nestCount++;
         health -= maxHealth / 3f;
         Debug.Log("Queen built a nest block! Health now: " + health);
@@ -181,7 +197,7 @@ void BuildNest()
     int GetGroundHeight(int x, int z)
     {
         // Find the highest non-air block
-        for (int y = worldManager.WorldHeight - 1; y >= 0; y--)
+        for (int y = config.World_Height * config.Chunk_Diameter - 1; y >= 0; y--)
         {
             AbstractBlock block = worldManager.GetBlock(x, y, z);
             if (!(block is AirBlock))
@@ -213,14 +229,14 @@ void BuildNest()
     void TryShareHealth()
     {
         // Find other ants at the same position
-        Collider[] nearbyColliders = Physics.OverlapSphere(transform.position, 0.5f);
+        Collider[] nearbyColliders = Physics.OverlapSphere(transform.position, 0.9f);
         
         foreach (Collider col in nearbyColliders)
         {
             Ant otherAnt = col.GetComponent<Ant>();
             
             // If theres another ant that need health
-            if (otherAnt != null && otherAnt != this && health > maxHealth * 0.7f && otherAnt.health < otherAnt.maxHealth * 0.4f)
+            if (otherAnt != null && otherAnt != this && health > maxHealth * 0.6f && otherAnt.health < otherAnt.maxHealth * 0.4f)
             {
                 // Transfer 10 health
                 float transferAmount = 30f;
@@ -232,5 +248,92 @@ void BuildNest()
             }
         }
     }
-}
 
+    float EvaluateCell(int x, int z)
+    {
+        int targetHeight = GetGroundHeight(x, z);
+        int currentHeight = GetGroundHeight(
+            Mathf.RoundToInt(transform.position.x),
+            Mathf.RoundToInt(transform.position.z)
+        );
+
+        int heightDiff = targetHeight - currentHeight;
+
+        // Too steep = unwalkable
+        if (Mathf.Abs(heightDiff) > 2)
+            return float.NegativeInfinity;
+
+        AbstractBlock block = worldManager.GetBlock(x, targetHeight + 1, z);
+        if (block is not AirBlock air)
+            return float.NegativeInfinity;
+
+        float score = 0f;
+
+        if (health > maxHealth * 0.6f)
+            score += air.nestPheromone * 2f;
+        else
+            score += air.foodPheromone * 2f;
+
+        score -= air.dangerPheromone * 2f;
+
+        return score;
+    }
+
+    
+    void MoveUsingPheromones()
+    {
+        Vector3[] directions = {
+            new Vector3(1, 0, 0), new Vector3(-1, 0, 0),
+            new Vector3(0, 0, 1), new Vector3(0, 0, -1),
+            new Vector3(1, 0, 1), new Vector3(1, 0, -1),
+            new Vector3(-1, 0, 1), new Vector3(-1, 0, -1),
+        };
+
+
+        Vector3 bestDirection = Vector3.zero;
+        float bestScore = float.NegativeInfinity;
+
+        int cx = Mathf.RoundToInt(transform.position.x);
+        int cz = Mathf.RoundToInt(transform.position.z);
+
+        foreach (Vector3 dir in directions)
+        {
+            int nx = cx + Mathf.RoundToInt(dir.x);
+            int nz = cz + Mathf.RoundToInt(dir.z);
+
+            if (nx < 0 || nx >= config.World_Diameter * config.Chunk_Diameter ||
+                nz < 0 || nz >= config.World_Diameter * config.Chunk_Diameter)
+                continue;
+
+            float score = EvaluateCell(nx, nz);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestDirection = dir;
+            }
+        }
+
+        if (bestScore > float.NegativeInfinity)
+        {
+            int tx = cx + Mathf.RoundToInt(bestDirection.x);
+            int tz = cz + Mathf.RoundToInt(bestDirection.z);
+            int ty = GetGroundHeight(tx, tz) + 1;
+
+            transform.position = new Vector3(tx, ty, tz);
+        }
+    }
+
+
+    void emitNestPheromones()
+    {
+        int x = Mathf.RoundToInt(transform.position.x);
+        int y = Mathf.RoundToInt(transform.position.y);
+        int z = Mathf.RoundToInt(transform.position.z);
+        AbstractBlock block = worldManager.GetBlock(x, y, z);
+        if (block is AirBlock air)
+        {
+            air.nestPheromone += 50f; // Emit nest pheromones to attract other ants
+            air.nestPheromone = Mathf.Clamp(air.nestPheromone, 0f, 100f); // Cap the pheromone level
+        }
+    }
+}
