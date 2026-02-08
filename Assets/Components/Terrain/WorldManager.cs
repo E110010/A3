@@ -122,7 +122,7 @@ namespace Antymology.Terrain
             queen2 = queenAnt;
             
             
-            // Spawn 20 regular ants
+            // Spawn 10 regular ants
             for (int i = 0; i < 20; i++)
             {
                 int x = RNG.Next(20, ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter - 10);
