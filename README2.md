@@ -16,6 +16,7 @@ The NestBlock class now has additional fields to allow for the tracking of ant p
 ### New Code
 A nest counter was added to the UI through the implementation of the NestCounter class, this counter is incremented whenever the queen ant builds a new nest block, and is reset when the generation changes. This count is also used as the overall fitness evaluation for generations.
 ![NestCounter](Images/NestCounter.png)
+
 New ant behaviour was implemented in the Ant class.
 #### Ant behaviour:
 - Ants have 100 health, ants lose 3 health per time tick, when an ants health hits 0, it dies and is destroyed
