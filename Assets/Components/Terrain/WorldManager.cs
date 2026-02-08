@@ -13,8 +13,8 @@ namespace Antymology.Terrain
 
         public Ant queen2;
 
-        const float EvaporationRate = 0.8f;
-        const float diffusionRate = 0.1f;
+        const float EvaporationRate = 0.3f;
+        const float diffusionRate = 0.5f;
 
         public int nestCount = 0;
 
@@ -89,6 +89,7 @@ namespace Antymology.Terrain
 
             GenerateAnts();
             gameObject.AddComponent<NestCounter>();
+            gameObject.AddComponent<EvolutionManager>();
         }
 
         /// <summary>
@@ -97,9 +98,9 @@ namespace Antymology.Terrain
         private void GenerateAnts()
         {
             // Spawn 1 Queen
-            int qx = RNG.Next(10, Blocks.GetLength(0) - 10);
-            int qz = RNG.Next(10, Blocks.GetLength(2) - 10);
-            int qy = Blocks.GetLength(1) - 1;
+            int qx = RNG.Next(10, ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter - 10);
+            int qz = RNG.Next(10, ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter - 10);
+            int qy = 20; // Spawn high up
             for (int checkY = Blocks.GetLength(1) - 1; checkY >= 0; checkY--)
             {
                 if (!(Blocks[qx, checkY, qz] is AirBlock))
@@ -121,15 +122,15 @@ namespace Antymology.Terrain
             queen2 = queenAnt;
             
             
-            // Spawn 10 regular ants
-            for (int i = 0; i < 10; i++)
+            // Spawn 20 regular ants
+            for (int i = 0; i < 20; i++)
             {
-                int x = RNG.Next(10, Blocks.GetLength(0) - 10);
-                int z = RNG.Next(10, Blocks.GetLength(2) - 10);
-                int y = Blocks.GetLength(1) - 1;
+                int x = RNG.Next(20, ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter - 10);
+                int z = RNG.Next(20, ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter - 10);
+                int y = 20; // Start high up
                 for (int checkY = Blocks.GetLength(1) - 1; checkY >= 0; checkY--)
                 {
-                    if (!(Blocks[qx, checkY, qz] is AirBlock))
+                    if (!(Blocks[x, checkY, z] is AirBlock))
                     {
                         y = checkY + 2;
                         break;
@@ -515,6 +516,7 @@ namespace Antymology.Terrain
 
         private void diffusePheromones()
         {
+            //store new pheromone values in a temporary array to avoid diffusion order issues
             float[,,] newFood = new float[ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
                 ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter,
                 ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter];
@@ -524,7 +526,7 @@ namespace Antymology.Terrain
             float[,,] newDanger = new float[ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
                 ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter,
                 ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter];
-
+            // Loop through all blocks and diffuse pheromones in air blocks (get pheromone from adjacent blocks, add proper amount to current)
             for (int x = 0; x < Blocks.GetLength(0); x++)
                 for (int z = 0; z < Blocks.GetLength(2); z++)
                     for (int y = 0; y < Blocks.GetLength(1); y++)
